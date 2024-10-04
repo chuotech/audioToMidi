@@ -1,60 +1,110 @@
 import librosa
 import numpy as np
 import mido
-from collections.abc import MutableSequence
-from madmom.features import CNNOnsetProcessor, OnsetPeakPickingProcessor
 from mido import Message, MidiFile, MidiTrack
 
-class audioToMidi():
-    def __init__(self, wav_file, midi_file, tempo=120):
-        self.wav_file = wav_file
-        self.midi_file = midi_file
-        self.tempo = tempo
-        self.sr = None
-        self.y = None
-        self.onset_times = None
 
-    def load_audio(self):
-        """Load the audio file."""
-        self.y, self.sr = librosa.load(self.wav_file)
-        print(f"Loaded audio file: {self.wav_file}")
+class Note:
+    def __init__(self, velocity, midi_note, start, end):
+        self.velocity = velocity
+        self.midi_note = midi_note
+        self.start = start
+        self.end = end
 
-    def detect_onsets(self):
-        """Detect onsets in the audio file."""
-        onset_processor = CNNOnsetProcessor()
-        onset_probs = onset_processor(self.y)
-        self.onset_times = OnsetPeakPickingProcessor(threshold=0.1)(onset_probs)
-        print(f"Detected {len(self.onset_times)} onsets.")
+class AudioMidiConverter:
+    def __init__(self, raga_map=None, root='D3', sr=16000, note_min='E2', note_max='E5', frame_size=2048,
+                 hop_length=441, outlier_coeff=2):
+        self.fmin = librosa.note_to_hz(note_min)
+        self.fmax = librosa.note_to_hz(note_max)
+        self.hop_length = hop_length
+        self.frame_size = frame_size
+        self.raga_map = np.array(raga_map) if raga_map else None
+        self.sr = sr
+        self.root = librosa.note_to_midi(root)
+        self.m = outlier_coeff
+        self.empty_arr = np.array([])
 
-    def convert_to_midi(self):
-        """Convert the detected onsets to MIDI format."""
-        midi = mido.MidiFile()
-        track = mido.MidiTrack()
-        midi.tracks.append(track)
+    def convert(self, y, return_onsets=False, velocity=100):
+        f0, voiced_flag, voiced_prob = librosa.pyin(y, fmin=self.fmin * 0.9, fmax=self.fmax * 1.1, sr=self.sr,
+                                                    frame_length=self.frame_size, hop_length=self.hop_length)
+        if len(f0) == 0:
+            print("No f0")
+            if return_onsets:
+                return self.empty_arr, self.empty_arr
+            return self.empty_arr
+
+        pitch = librosa.hz_to_midi(f0)
+        pitch[np.isnan(pitch)] = 0
+        onsets = self.get_onsets(y)
+        notes = np.zeros(len(onsets), dtype=int)
+        for i in range(len(onsets) - 1):
+            notes[i] = np.round(np.nanmedian(pitch[onsets[i]: onsets[i + 1]]))
+        notes[-1] = np.round(np.nanmedian(pitch[onsets[-1]:]))
+
+        onsets = onsets[notes > 0] * self.hop_length / self.sr
+        notes = notes[notes > 0]
+
+        if len(notes) > 0:
+            if self.raga_map is not None:
+                notes = self.filter_raga(notes)
+            notes = self.fix_outliers(notes, m=self.m)
+
+        temp = []
+        for i in range(len(notes)):
+            temp.append(Note(velocity, notes[i], start=onsets[i], end=onsets[i] + 0.1))
+
+        if return_onsets:
+            return temp, onsets
+
+        return temp
+
+    def save_midi(self, notes, filename):
+        """Save the detected notes to a MIDI file."""
+        midi_file = MidiFile()
+        track = MidiTrack()
+        midi_file.tracks.append(track)
 
         # Add a program change (set instrument)
         track.append(mido.Message('program_change', program=24))  # Change to desired instrument
 
-        for onset_time in self.onset_times:
-            ticks = int(onset_time * self.sr / 2)  # Adjust based on your desired ticks per beat
-            note = 60  # Fixed note (Middle C) for demonstration; you can enhance this.
-            track.append(mido.Message('note_on', note=note, velocity=64, time=ticks))
-            track.append(mido.Message('note_off', note=note, velocity=64, time=ticks + 100))  # Note duration
+        ticks_per_beat = 480  # Example ticks per beat
+        seconds_per_beat = 60.0 / 120  # Assuming a default tempo of 120 BPM
 
-        self.midi = midi
-        print(f"Converted to MIDI format.")
+        for note in notes:
+            note_start_tick = int(note.start / seconds_per_beat * ticks_per_beat)
+            note_end_tick = int(note.end / seconds_per_beat * ticks_per_beat)
 
-    def save_midi(self):
-        """Save the MIDI file to disk."""
-        self.midi.save(self.midi_file)
-        print(f'MIDI file saved as: {self.midi_file}')
+            track.append(mido.Message('note_on', note=note.midi_note, velocity=note.velocity, time=note_start_tick))
+            track.append(mido.Message('note_off', note=note.midi_note, velocity=note.velocity, time=note_end_tick))
 
-    def process(self):
-        """Complete processing from audio to MIDI."""
-        self.load_audio()
-        self.detect_onsets()
-        self.convert_to_midi()
-        self.save_midi()
+        midi_file.save(filename)
+        print(f"MIDI file saved as: {filename}")
+
+    def filter_raga(self, _notes):
+        filtered_notes = _notes.copy()
+        _n = _notes - self.root
+        code = (_n + 12) % 12
+        filtered_notes = filtered_notes[self.raga_map[code] == 1]
+        return filtered_notes
+
+    def get_onsets(self, y, threshold=0.01):
+        onset_env = librosa.onset.onset_strength(y=y, sr=self.sr, hop_length=self.hop_length)
+        onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=self.sr, hop_length=self.hop_length, backtrack=True)
+        return np.unique(np.hstack([0, onsets]))
+
+    def fix_outliers(self, notes, m):
+        median = np.median(notes)
+        mad = np.median(np.abs(notes - median))
+        lower_bound = median - m * mad
+        upper_bound = median + m * mad
+        return notes[(notes >= lower_bound) & (notes <= upper_bound)]
+
+    # def process(self):
+    #     """Complete processing from audio to MIDI."""
+    #     self.load_audio()
+    #     self.detect_onsets()
+    #     self.convert_to_midi()
+    #     self.save_midi()
 
 # try:
 #     y,sr = librosa.load('output.wav')
