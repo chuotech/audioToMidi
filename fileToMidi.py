@@ -62,32 +62,20 @@ class AudioMidiConverter:
     def save_midi(self, notes, filename, tempo):
         midi_data = pretty_midi.PrettyMIDI()
 
-    # Create an Instrument instance (for example, Piano)
         instrument = pretty_midi.Instrument(program=35)  # Change to desired instrument
-
-    # Set the tempo
-
-    # Define ticks per beat
-        ticks_per_beat = 30  # This should match your previous setup
-
         # Create notes
         for note in notes:
-            # Use pretty_midi to create Note objects
             start_time = note.start
             end_time = note.end
 
-        # Create a Note object with the MIDI note number, start and end times
             midi_note = pretty_midi.Note(
                 velocity=note.velocity,
                 pitch=note.midi_note,
                 start=start_time,
                 end=end_time
             )
-
-        # Add the note to the instrument
             instrument.notes.append(midi_note)
 
-     # Add the instrument to the PrettyMIDI object
         midi_data.instruments.append(instrument)
 
         # Write the MIDI data to a file
