@@ -1,9 +1,10 @@
 import wave
 import pyaudio
 import math
+import time
 
 class inputAudio:
-    def __init__(self, chunks=1024, format=pyaudio.paInt16, channels=1, rate=44100, recordTime=10, waveName='output.wav'):
+    def __init__(self, chunks=2048, format=pyaudio.paInt16, channels=1, rate=16000, recordTime=10, waveName='output.wav'):
         self.paudio = pyaudio.PyAudio()
         self.info = self.paudio.get_host_api_info_by_index(0)
         for i in range(0, self.info.get('deviceCount')):
@@ -20,6 +21,17 @@ class inputAudio:
         self.waveName = waveName
 
     def start(self):
+        print("Recording starting!")
+        timer = 3
+        while(timer >= 0):
+            if(timer == 0):
+                print("GO!")
+                timer -= 1
+            else:
+                print(timer)
+                timer -= 1
+                time.sleep(1)
+
         for i in range(0, math.ceil(self.rate / self.chunks * self.recordTime)):
             data = self.stream.read(self.chunks)
             self.frames.append(data)

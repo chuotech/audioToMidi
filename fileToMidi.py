@@ -1,6 +1,7 @@
 import librosa
 import numpy as np
 import mido
+import pretty_midi
 from mido import Message, MidiFile, MidiTrack
 
 
@@ -12,7 +13,7 @@ class Note:
         self.end = end
 
 class AudioMidiConverter:
-    def __init__(self, raga_map=None, root='D3', sr=16000, note_min='E2', note_max='E5', frame_size=2048,
+    def __init__(self, raga_map=None, root='E5', sr=16000, note_min='B1', note_max='E5', frame_size=2048,
                  hop_length=441, outlier_coeff=2):
         self.fmin = librosa.note_to_hz(note_min)
         self.fmax = librosa.note_to_hz(note_max)
@@ -58,27 +59,60 @@ class AudioMidiConverter:
 
         return temp
 
-    def save_midi(self, notes, filename):
-        """Save the detected notes to a MIDI file."""
-        midi_file = MidiFile()
-        track = MidiTrack()
-        midi_file.tracks.append(track)
+    def save_midi(self, notes, filename, tempo):
+        midi_data = pretty_midi.PrettyMIDI()
 
-        # Add a program change (set instrument)
-        track.append(mido.Message('program_change', program=24))  # Change to desired instrument
+    # Create an Instrument instance (for example, Piano)
+        instrument = pretty_midi.Instrument(program=35)  # Change to desired instrument
 
-        ticks_per_beat = 480  # Example ticks per beat
-        seconds_per_beat = 60.0 / 120  # Assuming a default tempo of 120 BPM
+    # Set the tempo
 
+    # Define ticks per beat
+        ticks_per_beat = 30  # This should match your previous setup
+
+        # Create notes
         for note in notes:
-            note_start_tick = int(note.start / seconds_per_beat * ticks_per_beat)
-            note_end_tick = int(note.end / seconds_per_beat * ticks_per_beat)
+            # Use pretty_midi to create Note objects
+            start_time = note.start
+            end_time = note.end
 
-            track.append(mido.Message('note_on', note=note.midi_note, velocity=note.velocity, time=note_start_tick))
-            track.append(mido.Message('note_off', note=note.midi_note, velocity=note.velocity, time=note_end_tick))
+        # Create a Note object with the MIDI note number, start and end times
+            midi_note = pretty_midi.Note(
+                velocity=note.velocity,
+                pitch=note.midi_note,
+                start=start_time,
+                end=end_time
+            )
 
-        midi_file.save(filename)
+        # Add the note to the instrument
+            instrument.notes.append(midi_note)
+
+     # Add the instrument to the PrettyMIDI object
+        midi_data.instruments.append(instrument)
+
+        # Write the MIDI data to a file
+        midi_data.write(filename)
         print(f"MIDI file saved as: {filename}")
+        # """Save the detected notes to a MIDI file."""
+        # midi_file = MidiFile()
+        # track = MidiTrack()
+        # midi_file.tracks.append(track)
+
+        # # Add a program change (set instrument)
+        # track.append(mido.Message('program_change', program=35))  # Change to desired instrument
+
+        # ticks_per_beat = 60  # Example ticks per beat
+        # seconds_per_beat = 60.0 / tempo # Assuming a default tempo of 120 BPM
+
+        # for note in notes:
+        #     note_start_tick = int(note.start / seconds_per_beat * ticks_per_beat)
+        #     note_end_tick = int(note.end / seconds_per_beat * ticks_per_beat)
+
+        #     track.append(mido.Message('note_on', note=note.midi_note, velocity=note.velocity, time=note_start_tick))
+        #     track.append(mido.Message('note_off', note=note.midi_note, velocity=note.velocity, time=note_end_tick))
+
+        # midi_file.save(filename)
+        # print(f"MIDI file saved as: {filename}")
 
     def filter_raga(self, _notes):
         filtered_notes = _notes.copy()
@@ -99,6 +133,13 @@ class AudioMidiConverter:
         upper_bound = median + m * mad
         return notes[(notes >= lower_bound) & (notes <= upper_bound)]
 
+    @staticmethod
+    def get_tempo(filename):
+        y,sr = librosa.load(filename, duration = 10)
+
+        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+        tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr)
+        return tempo[0]
     # def process(self):
     #     """Complete processing from audio to MIDI."""
     #     self.load_audio()
