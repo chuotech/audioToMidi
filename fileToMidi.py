@@ -13,13 +13,12 @@ class Note:
         self.end = end
 
 class AudioMidiConverter:
-    def __init__(self, raga_map=None, root='E5', sr=16000, note_min='B1', note_max='E5', frame_size=2048,
+    def __init__(self, root='E7', sr=44100, note_min='B1', note_max='E7', frame_size=2048,
                  hop_length=441, outlier_coeff=2):
         self.fmin = librosa.note_to_hz(note_min)
         self.fmax = librosa.note_to_hz(note_max)
         self.hop_length = hop_length
         self.frame_size = frame_size
-        self.raga_map = np.array(raga_map) if raga_map else None
         self.sr = sr
         self.root = librosa.note_to_midi(root)
         self.m = outlier_coeff
@@ -46,22 +45,28 @@ class AudioMidiConverter:
         notes = notes[notes > 0]
 
         if len(notes) > 0:
-            if self.raga_map is not None:
-                notes = self.filter_raga(notes)
             notes = self.fix_outliers(notes, m=self.m)
 
         temp = []
         for i in range(len(notes)):
-            temp.append(Note(velocity, notes[i], start=onsets[i], end=onsets[i] + 0.1))
+            if i < len(notes) - 1:
+                end_time = onsets[i+1]
+            else:
+                end_time = onsets[i] + .1
+            temp.append(Note(velocity, notes[i], start=onsets[i], end=end_time))
 
         if return_onsets:
             return temp, onsets
 
         return temp
 
-    def save_midi(self, notes, filename, tempo):
-        midi_data = pretty_midi.PrettyMIDI()
+    def save_midi(self, notes, filename, program_name, tempo):
+        midi_data = pretty_midi.PrettyMIDI(initial_tempo=tempo)
 
+        if program_name == 0:
+            instrument = pretty_midi.Instrument(program=35)
+        else:
+            instrument = pretty_midi.Instrument(program=25)
         instrument = pretty_midi.Instrument(program=35)  # Change to desired instrument
         # Create notes
         for note in notes:
@@ -102,12 +107,6 @@ class AudioMidiConverter:
         # midi_file.save(filename)
         # print(f"MIDI file saved as: {filename}")
 
-    def filter_raga(self, _notes):
-        filtered_notes = _notes.copy()
-        _n = _notes - self.root
-        code = (_n + 12) % 12
-        filtered_notes = filtered_notes[self.raga_map[code] == 1]
-        return filtered_notes
 
     def get_onsets(self, y, threshold=0.01):
         onset_env = librosa.onset.onset_strength(y=y, sr=self.sr, hop_length=self.hop_length)
