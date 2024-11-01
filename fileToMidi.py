@@ -66,7 +66,7 @@ class AudioMidiConverter:
         elif program_name == 1:
             instrument = pretty_midi.Instrument(program=25)
         elif program_name == 2:
-            instrument = pretty_midi.Instrument(program=11)
+            instrument = pretty_midi.Instrument(program=118)
         # Create notes
         if program_name != 2:
             for note in notes:
