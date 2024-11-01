@@ -12,7 +12,7 @@ class Note:
         self.end = end
 
 class AudioMidiConverter:
-    def __init__(self, root='E7', sr=44100, note_min='B1', note_max='E7', frame_size=2048,
+    def __init__(self, root='E9', sr=44100, note_min='A0', note_max='E9', frame_size=2048,
                  hop_length=441, outlier_coeff=2):
         self.fmin = librosa.note_to_hz(note_min)
         self.fmax = librosa.note_to_hz(note_max)
@@ -56,7 +56,6 @@ class AudioMidiConverter:
 
         if return_onsets:
             return temp, onsets
-
         return temp
 
     def save_midi(self, notes, filename, program_name, tempo):
@@ -64,21 +63,35 @@ class AudioMidiConverter:
 
         if program_name == 0:
             instrument = pretty_midi.Instrument(program=35)
-        else:
+        elif program_name == 1:
             instrument = pretty_midi.Instrument(program=25)
+        elif program_name == 2:
+            instrument = pretty_midi.Instrument(program=11)
         # Create notes
-        for note in notes:
-            start_time = note.start
-            end_time = note.end
+        if program_name != 2:
+            for note in notes:
+                start_time = note.start
+                end_time = note.end
 
-            midi_note = pretty_midi.Note(
-                velocity=note.velocity,
-                pitch=note.midi_note,
-                start=start_time,
-                end=end_time
-            )
-            instrument.notes.append(midi_note)
+                midi_note = pretty_midi.Note(
+                    velocity=note.velocity,
+                    pitch=note.midi_note,
+                    start=start_time,
+                    end=end_time
+                )
+                instrument.notes.append(midi_note)
+        else:
+            for note in notes:
+                start_time = note.start
+                end_time = note.end
 
+                midi_note = pretty_midi.Note(
+                    velocity=note.velocity,
+                    pitch=38,
+                    start=start_time,
+                    end=end_time
+                )
+                instrument.notes.append(midi_note)
         midi_data.instruments.append(instrument)
 
         # Write the MIDI data to a file
