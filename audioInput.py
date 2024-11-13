@@ -4,7 +4,7 @@ import math
 import time
 
 class inputAudio:
-    def __init__(self, chunks=2048, format=pyaudio.paInt16, channels=1, rate=44100, recordTime=12, waveName='output.wav'):
+    def __init__(self, chunks=2048, format=pyaudio.paInt16, channels=1, rate=44100, recordTime=12, waveName='output.mp3'):
         self.paudio = pyaudio.PyAudio()
         self.info = self.paudio.get_host_api_info_by_index(0)
         for i in range(0, self.info.get('deviceCount')):
@@ -57,7 +57,7 @@ class inputAudio:
             wf.writeframes(b''.join(self.frames))
         print(f"Audio saved as {self.outputWav}")
 
-
+    
 # CHUNK = 1024
 # FORMAT = pyaudio.paInt16
 # CHANNELS = 1

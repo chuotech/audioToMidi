@@ -1,11 +1,12 @@
 from audioInput import inputAudio
 from fileToMidi import AudioMidiConverter
 import librosa
-
+from ISMIRLCVR.chord_recognition import chord_recognition
 def main():
     ad = inputAudio()
     ad.start()
     ad.outputWav()
+
     # converter = AudioMidiConverter()
     # audio_data, _ = librosa.load("output.wav", sr=converter.sr)
     # notes = converter.convert(audio_data)
