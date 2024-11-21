@@ -2,7 +2,9 @@ import wave
 import pyaudio
 import math
 import time
-
+import threading
+import pygame
+from playsound import playsound
 class inputAudio:
     def __init__(self, chunks=2048, format=pyaudio.paInt16, channels=1, rate=44100, recordTime=12, waveName='output.mp3'):
         self.paudio = pyaudio.PyAudio()
@@ -19,10 +21,22 @@ class inputAudio:
         self.format = format
         self.recordTime = recordTime
         self.waveName = waveName
+        pygame.mixer.init()
+
+    def play_metronome(self, metronomepath):
+        print("Starting metronome...")
+        # Load the metronome sound
+        pygame.mixer.music.load(metronomepath)
+        # Play the sound 4 times (including the first play)
+        pygame.mixer.music.play(loops=4)
 
     def start(self):
         print("Recording starting!")
         timer = 3
+        metronomepath = r"C:\Users\chuot\Documents\GitHub\audioToMidi\metronome.mp3"
+        # Start the metronome sound in a separate thread
+        metronome_thread = threading.Thread(target=self.play_metronome, args=(metronomepath,))
+        metronome_thread.start()
         while(timer >= 0):
             if(timer == 0):
                 print("GO!")
@@ -30,7 +44,7 @@ class inputAudio:
             else:
                 print(timer)
                 timer -= 1
-                time.sleep(1)
+                time.sleep(.5)
 
         for i in range(0, math.ceil(self.rate / self.chunks * self.recordTime)):
             data = self.stream.read(self.chunks)
@@ -57,7 +71,6 @@ class inputAudio:
             wf.writeframes(b''.join(self.frames))
         print(f"Audio saved as {self.outputWav}")
 
-    
 # CHUNK = 1024
 # FORMAT = pyaudio.paInt16
 # CHANNELS = 1

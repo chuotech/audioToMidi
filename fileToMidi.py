@@ -2,6 +2,7 @@ import librosa
 import numpy as np
 import mido
 import pretty_midi
+from pychord import Chord
 from mido import Message, MidiFile, MidiTrack
 
 class Note:
@@ -12,7 +13,7 @@ class Note:
         self.end = end
 
 class AudioMidiConverter:
-    def __init__(self, root='E9', sr=44100, note_min='A0', note_max='E9', frame_size=2048,
+    def __init__(self, root='E7', sr=44100, note_min='B1', note_max='E7', frame_size=2048,
                  hop_length=441, outlier_coeff=2):
         self.fmin = librosa.note_to_hz(note_min)
         self.fmax = librosa.note_to_hz(note_max)
@@ -56,6 +57,7 @@ class AudioMidiConverter:
 
         if return_onsets:
             return temp, onsets
+
         return temp
 
     def save_midi(self, notes, filename, program_name, tempo):
@@ -63,35 +65,21 @@ class AudioMidiConverter:
 
         if program_name == 0:
             instrument = pretty_midi.Instrument(program=35)
-        elif program_name == 1:
-            instrument = pretty_midi.Instrument(program=25)
-        elif program_name == 2:
-            instrument = pretty_midi.Instrument(program=118)
-        # Create notes
-        if program_name != 2:
-            for note in notes:
-                start_time = note.start
-                end_time = note.end
-
-                midi_note = pretty_midi.Note(
-                    velocity=note.velocity,
-                    pitch=note.midi_note,
-                    start=start_time,
-                    end=end_time
-                )
-                instrument.notes.append(midi_note)
         else:
-            for note in notes:
-                start_time = note.start
-                end_time = note.end
+            instrument = pretty_midi.Instrument(program=25)
+        # Create notes
+        for note in notes:
+            start_time = note.start
+            end_time = note.end
 
-                midi_note = pretty_midi.Note(
-                    velocity=note.velocity,
-                    pitch=38,
-                    start=start_time,
-                    end=end_time
-                )
-                instrument.notes.append(midi_note)
+            midi_note = pretty_midi.Note(
+                velocity=note.velocity,
+                pitch=note.midi_note,
+                start=start_time,
+                end=end_time
+            )
+            instrument.notes.append(midi_note)
+
         midi_data.instruments.append(instrument)
 
         # Write the MIDI data to a file
@@ -118,3 +106,25 @@ class AudioMidiConverter:
         tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr)
         return tempo[0]
    
+    # def chord_transcription(self, chords):
+    #     mididata = pretty_midi.PrettyMIDI(initial_tempo=120)
+    #     instrument = pretty_midi.Instrument(program=25)
+
+    #     for chord in chords:
+    #         if (chord[2] == 'N'):
+    #             continue
+    #         c = Chord(chord[2][0]).components()
+    #         for note in c:
+    #             start_time = chord[0].round(2)
+    #             end_time = chord[1].round(2)
+
+    #             midi_note = pretty_midi.Note(
+    #                 velocity=100,
+    #                 pitch=librosa.note_to_midi(note)),
+    #                 start=start_time,
+    #                 end=end_time
+    #             )
+    #             instrument.notes.append(midi_note)
+    #     mididata.instruments.append(mididata)
+    #     mididata.write('chord_output')
+    #     print('Saved chord midi as chord_output.mid')
